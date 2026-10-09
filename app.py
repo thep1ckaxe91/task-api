@@ -120,7 +120,22 @@ def get_task(task_id):
 
 @app.route('/tasks/<int:task_id>', methods=['PATCH'])
 def update_task(task_id):
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    body, err = parse_json_obj()
+    if err:
+        return err
+    if not body:
+        return error("request body must contain at least one field", 400)
+    msg = validate_fields(body)
+    if msg:
+        return error(msg, 400)
+
+    task = tasks.get(task_id)
+    if task is None:
+        return error("task not found", 404)
+    task.update(body)
+    snapshot = dict(task)
+    return jsonify(snapshot), 200
+
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
@@ -128,6 +143,7 @@ def delete_task(task_id):
     if removed is None:
         return error("task not found", 404)
     return Response("", status=204)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
