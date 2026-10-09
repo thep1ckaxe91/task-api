@@ -1,60 +1,282 @@
 openapi: 3.0.3
 info:
   title: Tasks API
-  description: Service-Oriented Architecture - Tasks API
   version: 1.0.0
+  description: |
+    Service-Oriented Architecture - Tasks API.
+
+    Hợp đồng API (Single Source of Truth) cho 5 endpoint CRUD trên resource Task.
+  contact:
+    name: Tasks API team
+    url: https://github.com/thep1ckaxe91/task-api
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
 servers:
   - url: http://localhost:5000
     description: Local development server
+
+# API công khai, không yêu cầu xác thực
+security: []
+
+tags:
+  - name: tasks
+    description: Tạo, xem, cập nhật và xoá task
+
 paths:
   /tasks:
     get:
-      summary: List all tasks
+      tags: [tasks]
+      operationId: listTasks
+      summary: Danh sách task
+      description: Trả về toàn bộ task. Danh sách rỗng thì trả `[]`.
       responses:
         '200':
-          description: A list of tasks
+          description: Danh sách task
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+              examples:
+                twoTasks:
+                  summary: Có 2 task
+                  value:
+                    - id: 1
+                      title: Viết openapi.yaml
+                      description: Thiết kế 5 endpoint cho Tasks API
+                      completed: true
+                    - id: 2
+                      title: Implement CRUD
+                      description: Code 5 endpoint trong app.py theo spec
+                      completed: false
+                empty:
+                  summary: Chưa có task nào
+                  value: []
     post:
-      summary: Create a new task
+      tags: [tasks]
+      operationId: createTask
+      summary: Tạo task mới
+      description: |
+        `title` là bắt buộc. `description` mặc định là chuỗi rỗng, `completed` mặc định là `false`.
+        Server tự sinh `id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+            examples:
+              full:
+                summary: Đủ field
+                value:
+                  title: Viết openapi.yaml
+                  description: Thiết kế 5 endpoint cho Tasks API
+                  completed: false
+              titleOnly:
+                summary: Chỉ có title (field bắt buộc)
+                value:
+                  title: Viết openapi.yaml
       responses:
         '201':
-          description: Task created
+          description: Task đã được tạo
+          headers:
+            Location:
+              description: URL của task mới
+              schema:
+                type: string
+              example: /tasks/1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 1
+                title: Viết openapi.yaml
+                description: Thiết kế 5 endpoint cho Tasks API
+                completed: false
+        '400':
+          description: Thiếu `title` hoặc field sai kiểu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingTitle:
+                  summary: Thiếu title
+                  value:
+                    error: title is required
+                wrongType:
+                  summary: Sai kiểu dữ liệu
+                  value:
+                    error: completed must be a boolean
+
   /tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
     get:
-      summary: Get task by ID
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      tags: [tasks]
+      operationId: getTaskById
+      summary: Xem chi tiết task
+      description: Trả về task theo `id`.
       responses:
         '200':
-          description: Task detail
+          description: Chi tiết task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 1
+                title: Viết openapi.yaml
+                description: Thiết kế 5 endpoint cho Tasks API
+                completed: false
         '404':
-          description: Task not found
+          $ref: '#/components/responses/NotFound'
     patch:
-      summary: Update task partially
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      tags: [tasks]
+      operationId: updateTask
+      summary: Cập nhật một phần task
+      description: |
+        Chỉ gửi các field cần đổi (`title`, `description`, `completed`); field không gửi giữ nguyên.
+        Field sai kiểu hoặc `title` rỗng trả về 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+            examples:
+              markDone:
+                summary: Đánh dấu hoàn thành
+                value:
+                  completed: true
+              rename:
+                summary: Đổi title và description
+                value:
+                  title: Viết openapi.yaml (bản 2)
+                  description: Bổ sung example cho mọi response
       responses:
         '200':
-          description: Task updated
+          description: Task sau khi cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 1
+                title: Viết openapi.yaml
+                description: Thiết kế 5 endpoint cho Tasks API
+                completed: true
+        '400':
+          description: Field sai kiểu hoặc body rỗng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                wrongType:
+                  summary: Sai kiểu dữ liệu
+                  value:
+                    error: completed must be a boolean
+                emptyTitle:
+                  summary: title rỗng
+                  value:
+                    error: title must be a non-empty string
         '404':
-          description: Task not found
+          $ref: '#/components/responses/NotFound'
     delete:
-      summary: Delete a task
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      tags: [tasks]
+      operationId: deleteTask
+      summary: Xoá task
+      description: Xoá task theo `id`. Thành công trả 204, không có body.
       responses:
         '204':
-          description: Task deleted
+          description: Đã xoá (No Content)
         '404':
-          description: Task not found
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      description: Id của task
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+
+  schemas:
+    Task:
+      type: object
+      required: [id, title, description, completed]
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          description: Id do server sinh
+          example: 1
+        title:
+          type: string
+          minLength: 1
+          example: Viết openapi.yaml
+        description:
+          type: string
+          example: Thiết kế 5 endpoint cho Tasks API
+        completed:
+          type: boolean
+          example: false
+
+    TaskCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          example: Viết openapi.yaml
+        description:
+          type: string
+          default: ''
+          example: Thiết kế 5 endpoint cho Tasks API
+        completed:
+          type: boolean
+          default: false
+          example: false
+
+    TaskUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          example: Viết openapi.yaml (bản 2)
+        description:
+          type: string
+          example: Bổ sung example cho mọi response
+        completed:
+          type: boolean
+          example: true
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: task not found
+
+  responses:
+    NotFound:
+      description: Không tìm thấy task
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: task not found
