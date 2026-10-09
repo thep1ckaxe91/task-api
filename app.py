@@ -1,6 +1,6 @@
 import os
 import yaml
-from flask import Flask, jsonify, make_response, request
+from flask import Flask, jsonify, make_response, request, url_for
 from itertools import count
 
 app = Flask(__name__)
@@ -83,7 +83,31 @@ def list_tasks():
 
 @app.route('/tasks', methods=['POST'])
 def create_task():
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    body, err = parse_json_obj()
+    if err:
+        return err
+    assert(isinstance(body, dict))
+    if "title" not in body:
+        return error("title is required", 400)
+    msg = validate_fields(body)
+    if msg:
+        return error(msg, 400)
+
+    task_id = next(_id_seq)
+    task = {
+        "id": task_id,
+        "title": body["title"],
+        "description": body.get("description", ""),
+        "completed": body.get("completed", False)
+    }
+    tasks[task_id] = task
+    snapshot = dict(task)
+
+    resp = jsonify(snapshot)
+    resp.status_code = 201
+    resp.headers["Location"] = url_for("get_task", task_id=task_id)
+    return resp
+
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
