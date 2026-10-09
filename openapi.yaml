@@ -1,0 +1,60 @@
+openapi: 3.0.3
+info:
+  title: Tasks API
+  description: Service-Oriented Architecture - Tasks API
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+paths:
+  /tasks:
+    get:
+      summary: List all tasks
+      responses:
+        '200':
+          description: A list of tasks
+    post:
+      summary: Create a new task
+      responses:
+        '201':
+          description: Task created
+  /tasks/{id}:
+    get:
+      summary: Get task by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Task detail
+        '404':
+          description: Task not found
+    patch:
+      summary: Update task partially
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Task updated
+        '404':
+          description: Task not found
+    delete:
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Task deleted
+        '404':
+          description: Task not found
