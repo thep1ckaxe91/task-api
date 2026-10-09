@@ -1,0 +1,389 @@
+openapi: 3.0.3
+info:
+  title: Tasks API
+  description: High-performance, spec-first Task Management REST API with Bearer JWT and RFC 7807 Error Handling.
+  version: 1.0.0
+servers:
+  - url: http://127.0.0.1:5000
+    description: Local development server
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns service liveness and health status.
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: tasks-api
+                  version:
+                    type: string
+                    example: 1.0.0
+
+  /tasks:
+    get:
+      summary: List tasks
+      description: Retrieve a list of tasks using cursor-based pagination.
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of tasks to return (default 20, max 100).
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: starting_after
+          in: query
+          description: Cursor pointing to the last evaluated task ID for pagination.
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully retrieved tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+        '401':
+          description: Missing or invalid authentication token
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal server error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    post:
+      summary: Create task
+      description: Create a new task record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created successfully
+          headers:
+            Location:
+              description: URI of the newly created task
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Malformed JSON payload
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Validation failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal server error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /tasks/{id}:
+    get:
+      summary: Get task by ID
+      description: Retrieve details of a specific task by its identifier.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique task identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Task not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal server error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    patch:
+      summary: Update task
+      description: Partially update an existing task using RFC 7396 JSON Merge Patch semantics.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique task identifier
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Malformed JSON payload
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Task not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Validation failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal server error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+    delete:
+      summary: Delete task
+      description: Remove an existing task by identifier.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique task identifier
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Task successfully deleted (No Content)
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Task not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '500':
+          description: Internal server error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer authentication using JSON Web Token (RFC 7519)
+
+  schemas:
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          example: task-123e4567-e89b
+        title:
+          type: string
+          example: Complete Core Architecture PR
+        description:
+          type: string
+          nullable: true
+          example: Production-grade Flask core with RFC 7807 and Bearer JWT
+        status:
+          type: string
+          enum: [pending, in_progress, completed, cancelled]
+          example: in_progress
+        created_by:
+          type: string
+          nullable: true
+          example: usr_tech_lead
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-10-09T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-10-09T10:30:00Z'
+
+    TaskCreate:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Complete Core Architecture PR
+        description:
+          type: string
+          nullable: true
+          example: Production-grade Flask core with RFC 7807 and Bearer JWT
+        status:
+          type: string
+          enum: [pending, in_progress, completed, cancelled]
+          default: pending
+          example: pending
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Updated Task Title
+        description:
+          type: string
+          nullable: true
+          example: Updated description
+        status:
+          type: string
+          enum: [pending, in_progress, completed, cancelled]
+          example: completed
+
+    TaskListResponse:
+      type: object
+      required:
+        - data
+        - has_more
+        - limit
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        has_more:
+          type: boolean
+          example: false
+        next_cursor:
+          type: string
+          nullable: true
+          example: task-123e4567-e89b
+        limit:
+          type: integer
+          example: 20
+
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+          format: uri
+          example: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/422
+        title:
+          type: string
+          example: Unprocessable Entity
+        status:
+          type: integer
+          example: 422
+        detail:
+          type: string
+          example: Validation failed for submitted payload.
+        instance:
+          type: string
+          example: /tasks
+        invalid_params:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvalidParam'
+
+    InvalidParam:
+      type: object
+      required:
+        - name
+        - reason
+      properties:
+        name:
+          type: string
+          example: title
+        reason:
+          type: string
+          example: Field is required and cannot be empty
