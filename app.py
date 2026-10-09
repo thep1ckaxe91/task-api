@@ -1,13 +1,15 @@
 import os
-from flask import Flask, jsonify, make_response
 import yaml
+from flask import Flask, jsonify, make_response, request
+from itertools import count
 
 app = Flask(__name__)
 
-OPENAPI_SPEC_PATH = os.path.join(os.path.dirname(__file__), 'openapi.yaml')
+tasks: dict[int, dict] = {}
+_id_seq = count(1)
 
-# In-memory storage (reserved for K to implement)
-tasks = {}
+OPENAPI_SPEC_PATH = os.path.join(os.path.dirname(__file__), 'openapi.yaml')
+ALLOWED_FIELDS = frozenset({"title", "description", "completed"})
 
 @app.route('/openapi.json', methods=['GET'])
 def get_openapi_spec():
@@ -43,12 +45,41 @@ def docs():
     return make_response(swagger_html)
 
 # ==========================================
-# CRUD Endpoints (Stubs for K to implement)
+# CRUD Endpoints
 # ==========================================
+
+def error(message: str, status: int):
+    return jsonify(error=message), status
+
+
+def parse_json_obj():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return None, error("request body must be a JSON object", 400)
+    return body, None
+
+
+def validate_fields(body: dict) -> str | None:
+    unknown = set(body) - ALLOWED_FIELDS
+    if unknown:
+        return f"unknown field(s): {', '.join(sorted(unknown))}"
+
+    if "title" in body:
+        title = body["title"]
+        if not isinstance(title, str) or not title.strip():
+            return "title must be a non-empty string"
+    if "description" in body and not isinstance(body["description"], str):
+        return "description must be a string"
+    if "completed" in body and not isinstance(body["completed"], bool):
+        return "completed must be a boolean"
+
+    return None
+
 
 @app.route('/tasks', methods=['GET'])
 def list_tasks():
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    return jsonify([dict(t) for t in tasks.values()]), 200
+
 
 @app.route('/tasks', methods=['POST'])
 def create_task():
