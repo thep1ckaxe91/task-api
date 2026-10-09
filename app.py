@@ -145,5 +145,15 @@ def delete_task(task_id):
     return Response("", status=204)
 
 
+@app.errorhandler(404)
+def handle_404(_e):
+    return error("task not found" if request.path.startswith("/tasks/") else "resource not found", 404)
+
+
+@app.errorhandler(405)
+def handle_405(_e):
+    return error("method not allowed", 405)
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
