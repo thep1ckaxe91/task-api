@@ -1,6 +1,6 @@
 import os
 import yaml
-from flask import Flask, jsonify, make_response, request, url_for
+from flask import Flask, Response, jsonify, make_response, request, url_for
 from itertools import count
 
 app = Flask(__name__)
@@ -111,7 +111,12 @@ def create_task():
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    task = tasks.get(task_id)
+    snapshot = dict(task) if task is not None else None
+    if snapshot is None:
+        return error("task not found", 404)
+    return jsonify(snapshot), 200
+
 
 @app.route('/tasks/<int:task_id>', methods=['PATCH'])
 def update_task(task_id):
@@ -119,7 +124,10 @@ def update_task(task_id):
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    removed = tasks.pop(task_id, None)
+    if removed is None:
+        return error("task not found", 404)
+    return Response("", status=204)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
