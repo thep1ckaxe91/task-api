@@ -151,8 +151,8 @@ def handle_404(_e):
 
 
 @app.errorhandler(405)
-def handle_405(_e):
-    return error("method not allowed", 405)
+def handle_405(e):
+    return jsonify(error="method not allowed"), 405, e.get_headers()
 
 
 if __name__ == '__main__':
