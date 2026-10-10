@@ -1,13 +1,15 @@
 import os
-from flask import Flask, jsonify, make_response
 import yaml
+from flask import Flask, Response, jsonify, make_response, request, url_for
+from itertools import count
 
 app = Flask(__name__)
 
-OPENAPI_SPEC_PATH = os.path.join(os.path.dirname(__file__), 'openapi.yaml')
+tasks: dict[int, dict] = {}
+_id_seq = count(1)
 
-# In-memory storage (reserved for K to implement)
-tasks = {}
+OPENAPI_SPEC_PATH = os.path.join(os.path.dirname(__file__), 'openapi.yaml')
+ALLOWED_FIELDS = frozenset({"title", "description", "completed"})
 
 @app.route('/openapi.json', methods=['GET'])
 def get_openapi_spec():
@@ -43,28 +45,115 @@ def docs():
     return make_response(swagger_html)
 
 # ==========================================
-# CRUD Endpoints (Stubs for K to implement)
+# CRUD Endpoints
 # ==========================================
+
+def error(message: str, status: int):
+    return jsonify(error=message), status
+
+
+def parse_json_obj():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return None, error("request body must be a JSON object", 400)
+    return body, None
+
+
+def validate_fields(body: dict) -> str | None:
+    unknown = set(body) - ALLOWED_FIELDS
+    if unknown:
+        return f"unknown field(s): {', '.join(sorted(unknown))}"
+
+    if "title" in body:
+        title = body["title"]
+        if not isinstance(title, str) or not title.strip():
+            return "title must be a non-empty string"
+    if "description" in body and not isinstance(body["description"], str):
+        return "description must be a string"
+    if "completed" in body and not isinstance(body["completed"], bool):
+        return "completed must be a boolean"
+
+    return None
+
 
 @app.route('/tasks', methods=['GET'])
 def list_tasks():
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    return jsonify([dict(t) for t in tasks.values()]), 200
+
 
 @app.route('/tasks', methods=['POST'])
 def create_task():
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    body, err = parse_json_obj()
+    if err:
+        return err
+    assert(isinstance(body, dict))
+    if "title" not in body:
+        return error("title is required", 400)
+    msg = validate_fields(body)
+    if msg:
+        return error(msg, 400)
+
+    task_id = next(_id_seq)
+    task = {
+        "id": task_id,
+        "title": body["title"],
+        "description": body.get("description", ""),
+        "completed": body.get("completed", False)
+    }
+    tasks[task_id] = task
+    snapshot = dict(task)
+
+    resp = jsonify(snapshot)
+    resp.status_code = 201
+    resp.headers["Location"] = url_for("get_task", task_id=task_id)
+    return resp
+
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    task = tasks.get(task_id)
+    snapshot = dict(task) if task is not None else None
+    if snapshot is None:
+        return error("task not found", 404)
+    return jsonify(snapshot), 200
+
 
 @app.route('/tasks/<int:task_id>', methods=['PATCH'])
 def update_task(task_id):
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    body, err = parse_json_obj()
+    if err:
+        return err
+    if not body:
+        return error("request body must contain at least one field", 400)
+    msg = validate_fields(body)
+    if msg:
+        return error(msg, 400)
+
+    task = tasks.get(task_id)
+    if task is None:
+        return error("task not found", 404)
+    task.update(body)
+    snapshot = dict(task)
+    return jsonify(snapshot), 200
+
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    return jsonify({'message': 'Endpoint not implemented yet'}), 501
+    removed = tasks.pop(task_id, None)
+    if removed is None:
+        return error("task not found", 404)
+    return Response("", status=204)
+
+
+@app.errorhandler(404)
+def handle_404(_e):
+    return error("task not found" if request.path.startswith("/tasks/") else "resource not found", 404)
+
+
+@app.errorhandler(405)
+def handle_405(e):
+    return jsonify(error="method not allowed"), 405, e.get_headers()
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
